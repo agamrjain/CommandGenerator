@@ -35,7 +35,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
 
-
 import org.apache.xml.serialize.OutputFormat;
 import org.apache.xml.serialize.XMLSerializer;
 import org.w3c.dom.Document;
@@ -45,8 +44,13 @@ import org.xml.sax.SAXException;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-
-import com.rabbitmq.client.AMQP.Queue;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+ 
 import com.rabbitmq.client.Channel;
 
 public class MainController implements Initializable {
@@ -147,7 +151,7 @@ public class MainController implements Initializable {
 
 	private void makeCompleteLayout() {
 
-		serverAddressFeild.setText("non-prod");
+		
 		String x = mainchoiceBox.getValue();
 		String y = od_eod_choiceBox.getValue();
 
@@ -157,7 +161,7 @@ public class MainController implements Initializable {
 			gridPane.getChildren().clear();
 			if (c != null) {
 				setcAtPresend(c);
-				if (c.getProp1DisplayNames() != null) {
+				if (c.getProp1DisplayNames() != null && !c.getProp1DisplayNames().isEmpty()) {
 
 					prop1_choiceBox = new ChoiceBox<>();
 					feild1 = new TextField();
@@ -269,7 +273,8 @@ public class MainController implements Initializable {
 			String type = getType(od_eod_choiceBox.getValue(), mainchoiceBox.getValue());
 			String command = cAtPresend.generateCommandStructure(type, prop1, value1, cobDateString, mktS, eventType);
 
-			//command = formatXML(command);
+			command = format(command, false);
+			//command = formatXML(toXmlDocument(command));
 			cArea.setText(command);
 			//sendButton.setDisable(true);
 		} catch (Exception e) {
@@ -344,7 +349,7 @@ public class MainController implements Initializable {
 		errorAreaGen.setEditable(false);
 		errorAreaGen.setCenterShape(true);
 		
-		sendButton.setDisable(true);
+		//sendButton.setDisable(true);
 
 		listForMainChoiceBox = new ArrayList<>();
 		listForMainChoiceBox.add(Constants.TRADE);
@@ -357,24 +362,23 @@ public class MainController implements Initializable {
 		prop1DisplayNamesCashflow.add("trade_num");
 		prop1DisplayNamesCashflow.add("cashflow_num");
 
-		CommandClassNew cashflowOD = new CommandClassNew(Constants.CASHFLOW + Constants.ON_DEMAND, "",
-				prop1DisplayNamesCashflow, false, false, false, 0);
-		CommandClassNew cashflowODEOD = new CommandClassNew(Constants.CASHFLOW + Constants.ON_DEMAND_EOD, "",
-				prop1DisplayNamesCashflow, true, false, false, 1);
-		CommandClassNew cashflowDP = new CommandClassNew(Constants.CASHFLOW + Constants.DYNAMIC_POLLING, "",
-				prop1DisplayNamesCashflow, false, false, true, 0);
-		CommandClassNew cashflowEOD = new CommandClassNew(Constants.CASHFLOW + Constants.EOD, "", null, true, false,
-				false, 0);
+		CommandClassNew cashflowOD = new CommandClassNew(Constants.CASHFLOW + Constants.ON_DEMAND, "",prop1DisplayNamesCashflow, false, false, false, 0);
+		CommandClassNew cashflowODEOD = new CommandClassNew(Constants.CASHFLOW + Constants.ON_DEMAND_EOD, "",prop1DisplayNamesCashflow, true, false, false, 1);
+		CommandClassNew cashflowDP = new CommandClassNew(Constants.CASHFLOW + Constants.DYNAMIC_POLLING, "",prop1DisplayNamesCashflow, false, false, true, 0);
+		CommandClassNew cashflowEOD = new CommandClassNew(Constants.CASHFLOW + Constants.EOD, "", null, true, false,false, 0);
 
 		commandFormatMap.put(cashflowOD.getKey(), cashflowOD);
 		commandFormatMap.put(cashflowODEOD.getKey(), cashflowODEOD);
 		commandFormatMap.put(cashflowDP.getKey(), cashflowDP);
 		commandFormatMap.put(cashflowEOD.getKey(), cashflowEOD);
 
-		CommandClassNew TradeEOD = new CommandClassNew(Constants.TRADE + Constants.ON_DEMAND, "",
-				prop1DisplayNamesCashflow, true, true, true, 0);
+		CommandClassNew TradeEOD = new CommandClassNew(Constants.TRADE + Constants.ON_DEMAND, "",prop1DisplayNamesCashflow, true, true, true, 0);
 		commandFormatMap.put(TradeEOD.getKey(), TradeEOD);
-
+		
+		List<String> prop1DisplayNamesPositionEOD = new ArrayList<>();
+		CommandClassNew positionEOD = new CommandClassNew(Constants.POSITION + Constants.EOD, "", prop1DisplayNamesPositionEOD, true, false,false, 0);
+		commandFormatMap.put(positionEOD.getKey(), positionEOD);
+	
 	}
 
 	private String getType(String mode, String module) {
@@ -396,4 +400,51 @@ public class MainController implements Initializable {
 		return type;
 	}
 
+	
+	private static String formatXML(Document document) throws TransformerException {
+	    TransformerFactory transformerFactory = TransformerFactory
+	            .newInstance();
+	    Transformer transformer = transformerFactory.newTransformer();
+	    transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+	    transformer.setOutputProperty(
+	            "{http://xml.apache.org/xslt}indent-amount", "2");
+	    transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
+	    DOMSource source = new DOMSource(document);
+	    StringWriter strWriter = new StringWriter();
+	    StreamResult result = new StreamResult(strWriter);
+	 
+	    transformer.transform(source, result);
+	 
+	    return strWriter.getBuffer().toString();
+	 
+	}
+	
+	private static Document toXmlDocument(String str) throws ParserConfigurationException, SAXException, IOException {
+ 
+        DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory
+                .newInstance();
+        DocumentBuilder docBuilder = docBuilderFactory.newDocumentBuilder();
+        Document document = docBuilder.parse(new InputSource(new StringReader(
+                str)));
+ 
+        return document;
+    }
+	
+	 public static String format(String xml, Boolean ommitXmlDeclaration) throws IOException, SAXException, ParserConfigurationException {
+         
+	        DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+	        Document doc = db.parse(new InputSource(new StringReader(xml)));
+	          
+	        OutputFormat format = new OutputFormat(doc);
+	        format.setIndenting(true);
+	        format.setIndent(2);
+	        format.setOmitXMLDeclaration(ommitXmlDeclaration);
+	        format.setLineWidth(Integer.MAX_VALUE);
+	        Writer outxml = new StringWriter();
+	        XMLSerializer serializer = new XMLSerializer(outxml, format);
+	        serializer.serialize(doc);
+	          
+	        return outxml.toString();
+	          
+	        }
 }
